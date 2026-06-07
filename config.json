@@ -1,0 +1,77 @@
+{
+  "searches": [
+    {
+      "id": "sale_commercial",
+      "name": "Продаж комерції",
+      "url": "https://m.olx.ua/uk/nedvizhimost/kommercheskaya-nedvizhimost/prodazha-kommercheskoy-nedvizhimosti/zht/",
+      "enabled": true
+    },
+    {
+      "id": "sale_apartments",
+      "name": "Продаж квартир",
+      "url": "https://m.olx.ua/uk/nedvizhimost/kvartiry/prodazha-kvartir/zht/",
+      "enabled": false
+    },
+    {
+      "id": "sale_houses",
+      "name": "Продаж будинків",
+      "url": "https://m.olx.ua/uk/nedvizhimost/doma/prodazha-domov/zht/",
+      "enabled": true
+    },
+    {
+      "id": "sale_maf",
+      "name": "Продаж МАФів / кіосків",
+      "url": "https://m.olx.ua/uk/nedvizhimost/kommercheskaya-nedvizhimost/prodazha-kommercheskoy-nedvizhimosti/zht/q-%D0%BC%D0%B0%D1%84/",
+      "enabled": true
+    },
+    {
+      "id": "rent_commercial",
+      "name": "Оренда комерції",
+      "url": "https://m.olx.ua/uk/nedvizhimost/kommercheskaya-nedvizhimost/arenda-kommercheskoy-nedvizhimosti/zht/",
+      "enabled": false
+    },
+    {
+      "id": "rent_houses",
+      "name": "Оренда будинків",
+      "url": "https://m.olx.ua/uk/nedvizhimost/doma/arenda-domov/zht/",
+      "enabled": false
+    },
+    {
+      "id": "rent_maf",
+      "name": "Оренда МАФів / кіосків",
+      "url": "https://m.olx.ua/uk/nedvizhimost/kommercheskaya-nedvizhimost/arenda-kommercheskoy-nedvizhimosti/zht/q-%D0%BC%D0%B0%D1%84/",
+      "enabled": false
+    },
+    {
+      "id": "rent_apartments",
+      "name": "Оренда квартир",
+      "url": "https://m.olx.ua/uk/nedvizhimost/kvartiry/arenda-kvartir/zht/",
+      "enabled": false
+    },
+    {
+      "id": "sale_land",
+      "name": "Продаж земельних ділянок",
+      "url": "https://m.olx.ua/uk/nedvizhimost/zemlya/prodazha-zemli/zht/",
+      "enabled": true
+    }
+  ],
+  "filters": {
+    "include_keywords": [
+      "приміщення",
+      "магазин",
+      "склад",
+      "офіс",
+      "маф",
+      "кіоск",
+      "павільйон"
+    ],
+    "exclude_keywords": [
+      "гараж",
+      "паркомісце"
+    ],
+    "min_area": 30,
+    "max_area": null,
+    "min_price": null,
+    "max_price": null
+  }
+}
