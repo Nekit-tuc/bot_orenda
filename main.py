@@ -1984,9 +1984,10 @@ async def refresh_user_menus(context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="Меню оновлено.",
+                text="🔄 Бот оновлено. Меню актуалізовано.",
                 reply_markup=main_menu(),
             )
+            await asyncio.sleep(0.5)
         except Exception as error:
             print(f"Не вдалося оновити меню для {chat_id}: {error}")
 
