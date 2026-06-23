@@ -478,7 +478,9 @@ def save_config(config):
 
 
 def get_source_name(source_code):
-    return SOURCES.get(source_code, {}).get("name", source_code.upper())
+    if not source_code:
+        source_code = DEFAULT_SOURCE
+    return SOURCES.get(source_code, {}).get("name", str(source_code).upper())
 
 
 def get_source_button_title(source_code):
@@ -857,6 +859,8 @@ def main_menu():
 
 
 def source_menu(source_code):
+    if not source_code:
+        source_code = DEFAULT_SOURCE
     source_name = get_source_name(source_code)
     keyboard = [
         ["🔎 Перевірити зараз", "📂 Категорії"],
@@ -1031,7 +1035,7 @@ async def delete_tracked_messages(context, chat_id):
             pass
 
 
-async def send_city_ads(update, context, city, ads, limit=None):
+async def send_city_ads(update, context, city, ads, limit=20):
     chat_id = update.effective_chat.id
     await delete_tracked_messages(context, chat_id)
 
@@ -1051,14 +1055,17 @@ async def send_city_ads(update, context, city, ads, limit=None):
         f"🏙️ {city}\nЗбережених оголошень: {len(ads)}\nПоказую всі: {len(latest_ads)}.",
         reply_markup=city_detail_menu(),
     )
+    await asyncio.sleep(0.4)
     sent_ids.append(header.message_id)
 
     for index, ad in enumerate(latest_ads, start=1):
         message = await update.message.reply_text(
+            
             build_ad_text(ad, index),
             reply_markup=favorite_markup(ad),
             disable_web_page_preview=True,
         )
+        await asyncio.sleep(0.4)
         sent_ids.append(message.message_id)
 
     context.user_data["shown_ad_message_ids"] = sent_ids
