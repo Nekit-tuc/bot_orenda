@@ -1,4 +1,4 @@
-import json
+﻿import json
 import hashlib
 import os
 import re
@@ -1971,6 +1971,7 @@ async def auto_check(context: ContextTypes.DEFAULT_TYPE):
             f"Нових оголошень: {result.get('new', 0)}\n"
             f"Видалено неактуальних: {result.get('removed', 0)}",
         )
+        await refresh_user_menus(context)
     except Exception as error:
         await edit_status_messages(status_messages, f"❌ Планове оновлення не завершилось:\n{error}")
         await send_to_all(context, f"❌ Помилка автоперевірки:\n{error}")
@@ -2002,7 +2003,7 @@ def main():
         print('JobQueue не встановлено. Виконайте: pip install "python-telegram-bot[job-queue]"')
     else:
         app.job_queue.run_once(refresh_user_menus, when=3)
-        app.job_queue.run_repeating(auto_check, interval=3600, first=30)
+        app.job_queue.run_repeating(auto_check, interval=3600, first=3600)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(favorite_button_handler, pattern=r"^fav:"))
@@ -2014,3 +2015,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
