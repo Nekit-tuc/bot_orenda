@@ -629,6 +629,40 @@ def normalize_space(text):
     return re.sub(r"\s+", " ", text or "").strip()
 
 
+def normalize_duplicate_text(text):
+    text = normalize_space(text).casefold()
+    text = re.sub(r"https?://\S+|www\.\S+", " ", text)
+    text = re.sub(r"[^\w\sА-Яа-яІіЇїЄєҐґ]", " ", text)
+    text = re.sub(r"\b(?:id|код|номер)\s*\d+\b", " ", text)
+    return normalize_space(text)
+
+
+def ad_content_key(ad):
+    title = ad.get("title") or ""
+    description = ad.get("description") or ""
+    content = normalize_duplicate_text(f"{title} {description}")
+
+    if len(content) < 20:
+        return None
+
+    source = ad.get("source") or DEFAULT_SOURCE
+    city = ad.get("city") or ad.get("city_hint") or ""
+    category = ad.get("search_name") or ""
+    area = ad.get("area") or ""
+    price = ad.get("price") or ""
+    fingerprint = "|".join(
+        [
+            source,
+            normalize_duplicate_text(city),
+            normalize_duplicate_text(category),
+            str(area),
+            str(price),
+            content[:900],
+        ]
+    )
+    return hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()
+
+
 def canonical_city(value):
     value = normalize_space(value)
     if not value:
@@ -702,6 +736,10 @@ def save_ad_to_city(ad):
     source_code = ad.get("source") or DEFAULT_SOURCE
     ad_identity = ad.get("ad_id") or canonical_ad_identity(source_code, ad.get("url"))
     ad["ad_id"] = ad_identity
+    ad["content_key"] = ad.get("content_key") or ad_content_key(ad)
+    if ADS_STORAGE.has_content_key(source_code, ad.get("content_key")):
+        return False
+
     return ADS_STORAGE.upsert_ad(ad)
 
 
@@ -1434,8 +1472,13 @@ async def check_ads(context: ContextTypes.DEFAULT_TYPE, notify_if_empty=False, s
     filters_config = config.get("filters", {})
     new_ads_by_source = {source: [] for source in SOURCE_ORDER}
     seen_this_run = set()
+    content_seen_this_run = set()
 
     sources_to_check = [source_code] if source_code else SOURCE_ORDER
+
+    removed_duplicates = ADS_STORAGE.deactivate_duplicate_content(ad_content_key)
+    if removed_duplicates:
+        print(f"Видалено дублів оголошень за змістом: {removed_duplicates}")
 
     removed_inactive = remove_inactive_saved_ads(source_code, max_checks=8)
     if removed_inactive:
@@ -1540,12 +1583,23 @@ async def check_ads(context: ContextTypes.DEFAULT_TYPE, notify_if_empty=False, s
                 ad["city"] = detected_city or "Інше"
                 ad["active"] = True
                 ad["found_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                ad["content_key"] = ad_content_key(ad)
+
+                if ad["content_key"] and (
+                    ad["content_key"] in content_seen_this_run
+                    or ADS_STORAGE.has_content_key(ad_source, ad["content_key"])
+                ):
+                    seen.add(seen_key)
+                    seen_this_run.add(seen_key)
+                    continue
 
                 saved_new = save_ad_to_city(ad)
                 seen.add(seen_key)
                 seen_this_run.add(seen_key)
                 if not saved_new:
                     continue
+                if ad["content_key"]:
+                    content_seen_this_run.add(ad["content_key"])
                 new_ads_by_source.setdefault(ad_source, []).append(ad)
 
     save_seen(seen)

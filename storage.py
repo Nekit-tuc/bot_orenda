@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS ads (
     ad_id TEXT NOT NULL,
     url TEXT NOT NULL,
     title TEXT,
+    content_key TEXT,
     city TEXT,
     category TEXT,
     price REAL,
@@ -51,6 +52,15 @@ class AdsStorage:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(ads)").fetchall()
+            }
+            if "content_key" not in columns:
+                connection.execute("ALTER TABLE ads ADD COLUMN content_key TEXT")
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ads_content_key ON ads(source, content_key)"
+            )
         self._ready = True
 
     def upsert_ad(self, ad):
@@ -74,13 +84,14 @@ class AdsStorage:
             connection.execute(
                 """
                 INSERT INTO ads (
-                    source, ad_id, url, title, city, category, price, area,
+                    source, ad_id, url, title, content_key, city, category, price, area,
                     active, found_at, last_seen_at, last_checked_at, payload
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, ad_id) DO UPDATE SET
                     url = excluded.url,
                     title = excluded.title,
+                    content_key = excluded.content_key,
                     city = excluded.city,
                     category = excluded.category,
                     price = excluded.price,
@@ -95,6 +106,7 @@ class AdsStorage:
                     ad_id,
                     ad.get("url", ""),
                     ad.get("title", ""),
+                    ad.get("content_key"),
                     ad.get("city") or "Інше",
                     ad.get("search_name", ""),
                     ad.get("price"),
@@ -116,6 +128,23 @@ class AdsStorage:
                 "SELECT 1 FROM ads WHERE source = ? AND ad_id = ?",
                 (source, ad_id),
             ).fetchone()
+        return row is not None
+
+    def has_content_key(self, source, content_key):
+        self.init()
+        if not content_key:
+            return False
+
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT 1 FROM ads
+                WHERE source = ? AND content_key = ? AND active = 1
+                LIMIT 1
+                """,
+                (source, content_key),
+            ).fetchone()
+
         return row is not None
 
     def get_state(self, key, default=None):
@@ -215,6 +244,64 @@ class AdsStorage:
                 "UPDATE ads SET last_checked_at = ? WHERE source = ? AND ad_id = ?",
                 (time.strftime("%Y-%m-%d %H:%M:%S"), source, ad_id),
             )
+
+    def deactivate_duplicate_content(self, key_builder):
+        self.init()
+        removed = 0
+        seen = set()
+
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT source, ad_id, payload FROM ads
+                WHERE active = 1
+                ORDER BY COALESCE(found_at, ''), rowid
+                """
+            ).fetchall()
+
+            for row in rows:
+                ad = json.loads(row["payload"])
+                content_key = ad.get("content_key") or key_builder(ad)
+                if not content_key:
+                    continue
+
+                source = row["source"]
+                dedupe_key = (source, content_key)
+
+                if dedupe_key in seen:
+                    connection.execute(
+                        """
+                        UPDATE ads
+                        SET active = 0, content_key = ?, last_checked_at = ?
+                        WHERE source = ? AND ad_id = ?
+                        """,
+                        (
+                            content_key,
+                            time.strftime("%Y-%m-%d %H:%M:%S"),
+                            source,
+                            row["ad_id"],
+                        ),
+                    )
+                    removed += 1
+                    continue
+
+                seen.add(dedupe_key)
+                ad["content_key"] = content_key
+                connection.execute(
+                    """
+                    UPDATE ads
+                    SET content_key = ?, payload = ?
+                    WHERE source = ? AND ad_id = ?
+                    """,
+                    (
+                        content_key,
+                        json.dumps(ad, ensure_ascii=False),
+                        source,
+                        row["ad_id"],
+                    ),
+                )
+
+        return removed
 
     def migrate_from_ads_dir(self, ads_root, id_builder):
         self.init()
