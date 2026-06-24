@@ -96,6 +96,7 @@ REQUEST_HEADERS = {
 }
 DETAIL_WORKERS = 8
 CITY_WORKERS = 4
+DOMRIA_CITY_WORKERS = 2
 REQUEST_TIMEOUT = 8
 OLX_MAX_PAGES = 3
 DOMRIA_MAX_PAGES = 3
@@ -642,6 +643,11 @@ def normalize_duplicate_text(text):
 def ad_content_key(ad):
     title = ad.get("title") or ""
     description = ad.get("description") or ""
+    normalized_description = normalize_duplicate_text(description)
+
+    if len(normalized_description) < 80:
+        return None
+
     content = normalize_duplicate_text(f"{title} {description}")
 
     if len(content) < 20:
@@ -1307,13 +1313,13 @@ def parse_domria_city(search, category_path, city_name, city_slug):
             except Exception as error:
                 if attempt == 2:
                     print(f"DOM.RIA: помилка {city_name} {url}: {error}")
-                    return ads
+                    return None
                 time.sleep(1 + attempt)
 
         if response is None or response.status_code >= 400:
             status = response.status_code if response is not None else "без відповіді"
             print(f"DOM.RIA: пропускаю {city_name} {url}, статус {status}")
-            return ads
+            return None
 
         html = response.text
         html = re.split(r"Рекомендовані пропозиції|Ви переглянули всі пропозиції", html, maxsplit=1)[0]
@@ -1406,7 +1412,7 @@ def parse_domria(search, session=None):
         cities.append((city_name, city_slug))
         used_slugs.add(city_slug)
 
-    with ThreadPoolExecutor(max_workers=CITY_WORKERS) as executor:
+    with ThreadPoolExecutor(max_workers=DOMRIA_CITY_WORKERS) as executor:
         futures = {
             executor.submit(parse_domria_city, search, category_path, city_name, city_slug): city_name
             for city_name, city_slug in cities
@@ -1421,6 +1427,10 @@ def parse_domria(search, session=None):
                 continue
 
             city_name = futures[future]
+            if city_ads is None:
+                print(f"DOM.RIA / {search['name']} / {city_name}: тимчасово пропущено, кеш не оновлюю")
+                continue
+
             if city_ads:
                 clear_search_cache(search_cache, search, city_name)
                 cache_changed = True
@@ -2016,4 +2026,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
